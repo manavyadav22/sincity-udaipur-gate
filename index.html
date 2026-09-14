@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A0708">
+<title>Sin City Udaipur — Gate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ink:#0A0708; --surface:#151012; --raise:#1D1619; --line:#2B2125;
+    --red:#D81E2A; --red-deep:#7E1019; --mist:#9A8D91; --dim:#6A5E62;
+    --paper:#F5F0F1; --go:#2FBF6B; --go-deep:#0D2E1B; --hold:#E0A83C; --hold-deep:#2E240D;
+    --display:'Anton',Impact,'Arial Narrow Bold',sans-serif;
+    --ui:'Barlow','Helvetica Neue',Arial,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--ui);font-size:15px;line-height:1.5}
+  .shell{max-width:520px;margin:0 auto;padding-block:26px 64px;padding-left:18px;padding-right:18px;display:flex;flex-direction:column;gap:18px}
+
+  header{text-align:center;display:flex;flex-direction:column;gap:4px}
+  .mark{font-family:var(--display);font-size:40px;line-height:.9;letter-spacing:.14em;color:var(--red);text-indent:.14em}
+  .cities{font-size:10px;letter-spacing:.42em;color:var(--dim);text-indent:.42em}
+  .bill{font-size:12px;letter-spacing:.18em;color:var(--mist);margin-top:8px}
+  .bill strong{color:var(--paper);font-weight:600}
+
+  .verdict{border-radius:4px;padding:26px 20px;text-align:center;border-left:5px solid}
+  .verdict h2{font-family:var(--display);font-size:34px;line-height:1;letter-spacing:.06em;margin:0}
+  .verdict .no{font-family:var(--display);font-size:60px;line-height:1;margin:14px 0 0;letter-spacing:.04em}
+  .verdict p{margin:10px 0 0;font-size:13px;color:var(--mist)}
+  .verdict .code{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:var(--mist);margin-top:6px}
+  .go{background:var(--go-deep);border-color:var(--go)}   .go h2{color:var(--go)}
+  .stop{background:#2A0A0E;border-color:var(--red)}       .stop h2{color:#FF6470}
+  .hold{background:var(--hold-deep);border-color:var(--hold)} .hold h2{color:var(--hold)}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:20px}
+  .eyebrow{font-size:10px;letter-spacing:.34em;color:var(--dim);text-transform:uppercase}
+  .lede{font-family:var(--display);font-size:30px;letter-spacing:.04em;line-height:1.05;margin:8px 0 0}
+  .mono{font-family:var(--mono);letter-spacing:.06em}
+  .val{font-family:var(--mono);font-size:19px;margin-top:4px}
+
+  .scanner{position:relative;border-radius:4px;overflow:hidden;background:#000;border:1px solid var(--line)}
+  video{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+  .reticle{position:absolute;inset:15%;border:2px solid rgba(216,30,42,.9);border-radius:2px;pointer-events:none}
+  .reticle::before,.reticle::after{content:"";position:absolute;background:var(--red);left:-2px;right:-2px;height:2px}
+  .reticle::before{top:-2px} .reticle::after{bottom:-2px}
+  .camnote{padding:26px 18px;text-align:center;color:var(--mist);font-size:13px}
+
+  button{font:inherit;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:13px;border:0;border-radius:3px;padding:16px;width:100%;cursor:pointer;color:var(--paper);background:var(--red)}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--mist)}
+  button:focus-visible{outline:2px solid var(--paper);outline-offset:2px}
+  input{font:inherit;font-family:var(--mono);font-size:22px;letter-spacing:.3em;text-align:center;width:100%;padding:16px;border-radius:3px;border:1px solid var(--line);background:var(--ink);color:var(--paper)}
+  input:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+  .stack{display:flex;flex-direction:column;gap:10px}
+
+  .tally{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px}
+  .tally .n{font-family:var(--display);font-size:26px;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+  .chip{font-size:10px;letter-spacing:.2em;padding:4px 9px;border-radius:2px;background:var(--raise);color:var(--mist);text-transform:uppercase}
+  .chip.live{background:var(--go-deep);color:var(--go)}
+  .chip.off{background:var(--hold-deep);color:var(--hold)}
+
+  ol{list-style:none;margin:0;padding:0}
+  li{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line)}
+  li .pip{width:7px;height:7px;border-radius:50%;background:#3B3134;flex:0 0 auto}
+  li.done .pip{background:var(--go)}
+  li.done{color:var(--dim)}
+  li .who{flex:1;min-width:0;font-weight:600;font-variant-numeric:tabular-nums}
+  li .who span{display:block;font-family:var(--mono);font-size:10px;font-weight:400;color:var(--dim);letter-spacing:.08em}
+  li .when{font-family:var(--mono);font-size:11px;color:var(--mist)}
+  li button{width:auto;padding:8px 12px;font-size:11px;background:var(--raise);border:1px solid var(--line)}
+
+  footer{text-align:center;font-size:11px;line-height:2;color:var(--dim);letter-spacing:.06em;border-top:1px solid var(--line);padding-top:18px}
+  footer b{color:var(--red);font-weight:600;letter-spacing:.12em}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="mark">SIN CITY</div>
+    <div class="cities">UDAIPUR &times; AHMEDABAD</div>
+    <div class="bill"><strong>KAIRO</strong> &times; <strong>FIRANGI NIGHTS</strong></div>
+  </header>
+  <main id="view"></main>
+  <footer>
+    COMMUNITY PARTNER &middot; HUSTLING TOGETHER<br>
+    VENUE PARTNER &middot; GOYA HILLS<br><br>
+    POWERED BY <b>KAIRO</b>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script>
+(function () {
+  var API = 'https://gljamtxjzcazqeqztfuh.supabase.co/functions/v1/gate';
+  var TOTAL = 35;
+  var V = document.getElementById('view');
+  var PIN = '';
+  try { PIN = sessionStorage.getItem('sc_pin') || ''; } catch (e) {}
+
+  var roster = [];
+  var queue = [];
+  try { queue = JSON.parse(localStorage.getItem('sc_queue') || '[]'); } catch (e) { queue = []; }
+  function saveQueue() { try { localStorage.setItem('sc_queue', JSON.stringify(queue)); } catch (e) {} }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) { return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]; }); }
+  function codeOf(t) { return (String(t).split('#').pop() || '').trim().toUpperCase(); }
+  function clock(v) { try { return new Date(v).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }); } catch (e) { return ''; } }
+
+  function post(body) {
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, 12000);
+    return fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: ctl.signal
+    }).then(function (r) { clearTimeout(timer); return r.json(); });
+  }
+
+  /* ---------------- guest ---------------- */
+  function guest(code) {
+    V.innerHTML = '<div class="panel"><div class="eyebrow">Entry pass</div><div class="lede">Checking&hellip;</div></div>';
+    post({ action: 'status', code: code }).then(function (r) {
+      if (!r.ok || !r.pass) {
+        V.innerHTML =
+          '<div class="verdict stop"><h2>NOT ON THE LIST</h2><div class="code">' + esc(code) + '</div>' +
+          '<p>Yeh code guest list me nahi hai.</p></div>' +
+          '<div class="stack" style="margin-top:18px"><button class="ghost" id="staff">Staff &middot; gate mode</button></div>';
+        wireStaff(); return;
+      }
+      var p = r.pass;
+      V.innerHTML =
+        '<div class="panel"><div class="eyebrow">Entry pass</div>' +
+        '<div class="lede">PASS ' + esc(p.pass_no) + ' / ' + TOTAL + '</div>' +
+        '<div style="margin-top:16px" class="eyebrow">Pass code</div>' +
+        '<div class="val">' + esc(p.code) + '</div></div>' +
+        (p.used_at
+          ? '<div class="verdict stop" style="margin-top:18px"><h2>ALREADY USED</h2><p>Entry ho chuki: ' + clock(p.used_at) + '</p></div>'
+          : '<div class="verdict hold" style="margin-top:18px"><h2>SHOW AT THE GATE</h2><p>Staff is QR ko scan karega. Ek hi baar valid hai &mdash; kisi aur ko forward mat karo.</p></div>') +
+        '<div class="stack" style="margin-top:18px"><button class="ghost" id="staff">Staff &middot; gate mode</button></div>';
+      wireStaff();
+    }).catch(function () {
+      V.innerHTML =
+        '<div class="verdict hold"><h2>NO CONNECTION</h2><p>Pass details abhi load nahi hui. Gate par staff scan kar lega.</p></div>' +
+        '<div class="panel" style="margin-top:18px"><div class="eyebrow">Pass code</div><div class="val">' + esc(code) + '</div></div>' +
+        '<div class="stack" style="margin-top:18px"><button class="ghost" id="staff">Staff &middot; gate mode</button></div>';
+      wireStaff();
+    });
+  }
+  function wireStaff() {
+    var b = document.getElementById('staff');
+    if (b) b.addEventListener('click', function () { unlock(); });
+  }
+
+  /* ---------------- staff unlock ---------------- */
+  function unlock() {
+    if (PIN) return gate();
+    V.innerHTML =
+      '<div class="panel"><div class="eyebrow">Staff only</div><div class="lede">Gate PIN</div>' +
+      '<div class="stack" style="margin-top:16px">' +
+      '<input id="pin" type="tel" inputmode="numeric" maxlength="6" placeholder="&middot;&middot;&middot;&middot;" autocomplete="off">' +
+      '<button id="go">Unlock gate</button></div></div>';
+    var box = document.getElementById('pin');
+    var go = function () {
+      var v = box.value.trim();
+      post({ action: 'auth', pin: v }).then(function (r) {
+        if (!r.ok) { box.value = ''; box.placeholder = 'WRONG PIN'; return; }
+        PIN = v; try { sessionStorage.setItem('sc_pin', v); } catch (e) {}
+        gate();
+      }).catch(function () { box.placeholder = 'NO NETWORK'; });
+    };
+    document.getElementById('go').addEventListener('click', go);
+    box.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    box.focus();
+  }
+
+  /* ---------------- gate ---------------- */
+  var stream = null, raf = null, scanning = false;
+  function stopCam() {
+    if (raf) cancelAnimationFrame(raf);
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; raf = null;
+  }
+
+  function gate(verdict) {
+    stopCam();
+    V.innerHTML =
+      (verdict || '') +
+      '<div class="scanner" id="scanner"><video id="cam" playsinline muted></video><div class="reticle"></div></div>' +
+      '<div class="stack" style="margin-top:14px"><button id="next">Scan next pass</button></div>' +
+      '<div class="panel" style="margin-top:18px">' +
+        '<div class="tally"><div><div class="eyebrow">Checked in</div><div class="n" id="tally">&mdash; / ' + TOTAL + '</div></div>' +
+        '<span class="chip" id="net">connecting</span></div>' +
+        '<ol id="roster"></ol>' +
+        '<div class="stack" style="margin-top:16px">' +
+        '<button class="ghost" id="csv">Export check-in list</button>' +
+        '<button class="ghost" id="reset">Reset all check-ins</button></div></div>';
+    document.getElementById('next').addEventListener('click', function () { gate(); });
+    document.getElementById('csv').addEventListener('click', exportCsv);
+    document.getElementById('reset').addEventListener('click', function () {
+      if (!confirm('Sab check-ins reset kar dein?')) return;
+      post({ action: 'reset', pin: PIN }).then(function () { queue = []; saveQueue(); gate(); });
+    });
+    paint();
+    sync();
+    startCam();
+  }
+
+  function paint() {
+    var el = document.getElementById('roster');
+    if (!el) return;
+    var pendingCodes = queue.map(function (q) { return q.code; });
+    var used = roster.filter(function (p) { return p.used_at || pendingCodes.indexOf(p.code) > -1; }).length;
+    var t = document.getElementById('tally');
+    if (t) t.textContent = (roster.length ? used : '—') + ' / ' + TOTAL;
+    el.innerHTML = roster.map(function (p) {
+      var offline = pendingCodes.indexOf(p.code) > -1;
+      var done = p.used_at || offline;
+      return '<li class="' + (done ? 'done' : '') + '"><span class="pip"></span>' +
+        '<span class="who">Pass ' + esc(p.pass_no) + '<span>' + esc(p.code) + '</span></span>' +
+        (done
+          ? '<span class="when">' + (offline ? 'offline' : clock(p.used_at)) + '</span>'
+          : '<button data-code="' + esc(p.code) + '">Check in</button>') + '</li>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('button[data-code]'), function (b) {
+      b.addEventListener('click', function () { check(b.getAttribute('data-code')); });
+    });
+  }
+
+  function netChip(state, label) {
+    var c = document.getElementById('net');
+    if (c) { c.className = 'chip ' + state; c.textContent = label; }
+  }
+
+  function sync() {
+    var first = queue.length
+      ? post({ action: 'sync', pin: PIN, items: queue }).then(function () { queue = []; saveQueue(); })
+      : Promise.resolve();
+    return first.catch(function () {}).then(function () {
+      return post({ action: 'list', pin: PIN });
+    }).then(function (r) {
+      if (!r || !r.ok) return;
+      roster = r.passes;
+      netChip('live', 'live');
+      paint();
+    }).catch(function () {
+      netChip('off', queue.length ? queue.length + ' to sync' : 'offline');
+      paint();
+    });
+  }
+
+  function check(code) {
+    post({ action: 'checkin', pin: PIN, code: code }).then(function (r) {
+      if (!r.ok) throw new Error('api');
+      if (r.status === 'allowed') {
+        return gate('<div class="verdict go"><h2>ENTRY ALLOWED</h2><div class="no">' + esc(r.pass.pass_no) +
+          '</div><div class="code">' + esc(r.pass.code) + '</div></div>');
+      }
+      if (r.status === 'used') {
+        return gate('<div class="verdict stop"><h2>ALREADY USED</h2><div class="no">' + esc(r.pass.pass_no) +
+          '</div><p>Pehle entry ho chuki: ' + clock(r.pass.used_at) + '</p></div>');
+      }
+      return gate('<div class="verdict stop"><h2>NOT A VALID PASS</h2><div class="code">' + esc(code) + '</div></div>');
+    }).catch(function () {
+      var known = roster.filter(function (p) { return p.code === code; })[0];
+      if (!known) {
+        return gate('<div class="verdict stop"><h2>NOT A VALID PASS</h2><div class="code">' + esc(code) + '</div>' +
+          '<p>Offline &mdash; is code ka record nahi mila.</p></div>');
+      }
+      var already = known.used_at || queue.filter(function (q) { return q.code === code; }).length;
+      if (already) {
+        return gate('<div class="verdict stop"><h2>ALREADY USED</h2><div class="no">' + esc(known.pass_no) + '</div></div>');
+      }
+      queue.push({ code: code, at: Date.now() }); saveQueue();
+      gate('<div class="verdict hold"><h2>ALLOWED &middot; OFFLINE</h2><div class="no">' + esc(known.pass_no) +
+        '</div><p>Record ho gaya. Internet aate hi sync ho jayega.</p></div>');
+    });
+  }
+
+  function startCam() {
+    var v = document.getElementById('cam');
+    if (!v || !navigator.mediaDevices) return camFail();
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (s) {
+      stream = s; v.srcObject = s; return v.play();
+    }).then(function () {
+      var c = document.createElement('canvas');
+      var x = c.getContext('2d', { willReadFrequently: true });
+      var det = null;
+      if ('BarcodeDetector' in window) { try { det = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) {} }
+      scanning = false;
+      var done = function (val) {
+        scanning = false;
+        if (val) { stopCam(); check(codeOf(val)); return; }
+        raf = requestAnimationFrame(tick);
+      };
+      var tick = function () {
+        if (v.readyState !== v.HAVE_ENOUGH_DATA || scanning) { raf = requestAnimationFrame(tick); return; }
+        scanning = true;
+        if (det) {
+          det.detect(v).then(function (r) { done(r.length ? r[0].rawValue : null); }).catch(function () { done(null); });
+          return;
+        }
+        try {
+          c.width = v.videoWidth; c.height = v.videoHeight;
+          x.drawImage(v, 0, 0, c.width, c.height);
+          var d = x.getImageData(0, 0, c.width, c.height);
+          var r = (typeof jsQR === 'function') ? jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' }) : null;
+          done(r ? r.data : null);
+        } catch (e) { done(null); }
+      };
+      tick();
+    }).catch(camFail);
+  }
+  function camFail() {
+    var s = document.getElementById('scanner');
+    if (s) s.innerHTML = '<div class="camnote">Camera band hai. Niche list se manually check-in karo, ya camera permission allow karke page reload karo.</div>';
+  }
+
+  function exportCsv() {
+    var rows = [['pass_no', 'code', 'status', 'entry_time']].concat(roster.map(function (p) {
+      return [p.pass_no, p.code, p.used_at ? 'IN' : 'NOT USED', p.used_at ? clock(p.used_at) : ''];
+    }));
+    var csv = rows.map(function (r) { return r.map(function (c) { return '"' + c + '"'; }).join(','); }).join('\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'sincity-checkins.csv';
+    a.click();
+  }
+
+  /* ---------------- boot ---------------- */
+  var h = codeOf(location.hash);
+  if (location.hash && h.indexOf('SC26-') === 0) { guest(h); }
+  else if (PIN) { gate(); }
+  else {
+    V.innerHTML =
+      '<div class="panel"><div class="eyebrow">Sin City Udaipur</div>' +
+      '<div class="lede">ENTRY CONTROL</div>' +
+      '<p style="color:var(--mist);margin:12px 0 0;font-size:14px">Guest apna pass QR scan karke yahan pahunchta hai. Gate staff niche se scanner kholein.</p>' +
+      '<div class="stack" style="margin-top:18px"><button id="open">Open gate scanner</button></div></div>';
+    document.getElementById('open').addEventListener('click', unlock);
+  }
+})();
+</script>
+</body>
+</html>
