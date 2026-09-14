@@ -11,7 +11,7 @@
 <style>
   :root{
     --ink:#0A0708; --surface:#151012; --raise:#1D1619; --line:#2B2125;
-    --red:#D81E2A; --red-deep:#7E1019; --mist:#9A8D91; --dim:#6A5E62;
+    --red:#D81E2A; --mist:#9A8D91; --dim:#6A5E62;
     --paper:#F5F0F1; --go:#2FBF6B; --go-deep:#0D2E1B; --hold:#E0A83C; --hold-deep:#2E240D;
     --display:'Anton',Impact,'Arial Narrow Bold',sans-serif;
     --ui:'Barlow','Helvetica Neue',Arial,sans-serif;
@@ -43,16 +43,20 @@
   .val{font-family:var(--mono);font-size:19px;margin-top:4px}
 
   .scanner{position:relative;border-radius:4px;overflow:hidden;background:#000;border:1px solid var(--line)}
-  video{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+  video{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#000}
   .reticle{position:absolute;inset:15%;border:2px solid rgba(216,30,42,.9);border-radius:2px;pointer-events:none}
   .reticle::before,.reticle::after{content:"";position:absolute;background:var(--red);left:-2px;right:-2px;height:2px}
   .reticle::before{top:-2px} .reticle::after{bottom:-2px}
-  .camnote{padding:26px 18px;text-align:center;color:var(--mist);font-size:13px}
+  .cover{position:absolute;inset:0;background:rgba(8,6,7,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:26px;text-align:center}
+  .cover p{margin:0;color:var(--mist);font-size:13px}
+  .cover .why{color:var(--paper);font-size:14px;font-weight:600}
+  .cover .tag{color:var(--hold);font-family:var(--display);font-size:20px;letter-spacing:.08em;margin:0}
 
   button{font:inherit;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:13px;border:0;border-radius:3px;padding:16px;width:100%;cursor:pointer;color:var(--paper);background:var(--red)}
   button.ghost{background:transparent;border:1px solid var(--line);color:var(--mist)}
+  button.mini{width:auto;padding:11px 18px}
   button:focus-visible{outline:2px solid var(--paper);outline-offset:2px}
-  input{font:inherit;font-family:var(--mono);font-size:22px;letter-spacing:.3em;text-align:center;width:100%;padding:16px;border-radius:3px;border:1px solid var(--line);background:var(--ink);color:var(--paper)}
+  input{font:inherit;font-family:var(--mono);font-size:20px;letter-spacing:.18em;text-align:center;width:100%;padding:16px;border-radius:3px;border:1px solid var(--line);background:var(--ink);color:var(--paper)}
   input:focus-visible{outline:2px solid var(--red);outline-offset:1px}
   .stack{display:flex;flex-direction:column;gap:10px}
 
@@ -74,6 +78,7 @@
 
   footer{text-align:center;font-size:11px;line-height:2;color:var(--dim);letter-spacing:.06em;border-top:1px solid var(--line);padding-top:18px}
   footer b{color:var(--red);font-weight:600;letter-spacing:.12em}
+  [hidden]{display:none!important}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -109,6 +114,7 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) { return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]; }); }
   function codeOf(t) { return (String(t).split('#').pop() || '').trim().toUpperCase(); }
   function clock(v) { try { return new Date(v).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }); } catch (e) { return ''; } }
+  function el(id) { return document.getElementById(id); }
 
   function post(body) {
     var ctl = new AbortController();
@@ -150,8 +156,8 @@
     });
   }
   function wireStaff() {
-    var b = document.getElementById('staff');
-    if (b) b.addEventListener('click', function () { unlock(); });
+    var b = el('staff');
+    if (b) b.addEventListener('click', unlock);
   }
 
   /* ---------------- staff unlock ---------------- */
@@ -162,7 +168,7 @@
       '<div class="stack" style="margin-top:16px">' +
       '<input id="pin" type="tel" inputmode="numeric" maxlength="6" placeholder="&middot;&middot;&middot;&middot;" autocomplete="off">' +
       '<button id="go">Unlock gate</button></div></div>';
-    var box = document.getElementById('pin');
+    var box = el('pin');
     var go = function () {
       var v = box.value.trim();
       post({ action: 'auth', pin: v }).then(function (r) {
@@ -171,25 +177,38 @@
         gate();
       }).catch(function () { box.placeholder = 'NO NETWORK'; });
     };
-    document.getElementById('go').addEventListener('click', go);
+    el('go').addEventListener('click', go);
     box.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
     box.focus();
   }
 
-  /* ---------------- gate ---------------- */
-  var stream = null, raf = null, scanning = false;
-  function stopCam() {
-    if (raf) cancelAnimationFrame(raf);
-    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
-    stream = null; raf = null;
-  }
+  /* ---------------- gate ----------------
+     The camera stream is started once, by an explicit tap, and then kept
+     running between guests. iOS Safari only hands over the camera inside a
+     real user gesture, so it is never started from inside a promise. */
+  var stream = null, raf = null, armed = false, reading = false;
 
-  function gate(verdict) {
-    stopCam();
+  function gate() {
     V.innerHTML =
-      (verdict || '') +
-      '<div class="scanner" id="scanner"><video id="cam" playsinline muted></video><div class="reticle"></div></div>' +
-      '<div class="stack" style="margin-top:14px"><button id="next">Scan next pass</button></div>' +
+      '<div id="verdict"></div>' +
+      '<div class="scanner" id="scanner">' +
+        '<video id="cam" playsinline autoplay muted></video>' +
+        '<div class="reticle" id="reticle" hidden></div>' +
+        '<div class="cover" id="cover">' +
+          '<p class="tag">SCANNER READY</p>' +
+          '<p>Camera on karne ke liye tap karo. Safari permission maangega &mdash; Allow dabana.</p>' +
+          '<button class="mini" id="camstart">Start camera</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="stack" style="margin-top:14px">' +
+        '<button class="ghost" id="manual">Enter pass code by hand</button>' +
+      '</div>' +
+      '<div id="manualbox" hidden style="margin-top:10px">' +
+        '<div class="panel"><div class="eyebrow">Manual check-in</div>' +
+        '<div class="stack" style="margin-top:12px">' +
+        '<input id="mcode" type="text" autocapitalize="characters" autocomplete="off" placeholder="SC26-000-XXXXXX">' +
+        '<button id="mgo">Check in this code</button></div></div>' +
+      '</div>' +
       '<div class="panel" style="margin-top:18px">' +
         '<div class="tally"><div><div class="eyebrow">Checked in</div><div class="n" id="tally">&mdash; / ' + TOTAL + '</div></div>' +
         '<span class="chip" id="net">connecting</span></div>' +
@@ -197,40 +216,56 @@
         '<div class="stack" style="margin-top:16px">' +
         '<button class="ghost" id="csv">Export check-in list</button>' +
         '<button class="ghost" id="reset">Reset all check-ins</button></div></div>';
-    document.getElementById('next').addEventListener('click', function () { gate(); });
-    document.getElementById('csv').addEventListener('click', exportCsv);
-    document.getElementById('reset').addEventListener('click', function () {
-      if (!confirm('Sab check-ins reset kar dein?')) return;
-      post({ action: 'reset', pin: PIN }).then(function () { queue = []; saveQueue(); gate(); });
+
+    el('camstart').addEventListener('click', function () { startCam(false); });
+    el('manual').addEventListener('click', function () {
+      var b = el('manualbox');
+      b.hidden = !b.hidden;
+      if (!b.hidden) el('mcode').focus();
     });
+    var mgo = function () {
+      var v = codeOf(el('mcode').value);
+      if (v) { el('mcode').value = ''; check(v); }
+    };
+    el('mgo').addEventListener('click', mgo);
+    el('mcode').addEventListener('keydown', function (e) { if (e.key === 'Enter') mgo(); });
+    el('csv').addEventListener('click', exportCsv);
+    el('reset').addEventListener('click', function () {
+      if (!confirm('Sab check-ins reset kar dein?')) return;
+      post({ action: 'reset', pin: PIN }).then(function () { queue = []; saveQueue(); sync(); });
+    });
+
     paint();
     sync();
-    startCam();
+  }
+
+  function verdict(html) {
+    var v = el('verdict');
+    if (v) { v.innerHTML = html; window.scrollTo({ top: 0, behavior: 'smooth' }); }
   }
 
   function paint() {
-    var el = document.getElementById('roster');
-    if (!el) return;
-    var pendingCodes = queue.map(function (q) { return q.code; });
-    var used = roster.filter(function (p) { return p.used_at || pendingCodes.indexOf(p.code) > -1; }).length;
-    var t = document.getElementById('tally');
+    var list = el('roster');
+    if (!list) return;
+    var pending = queue.map(function (q) { return q.code; });
+    var used = roster.filter(function (p) { return p.used_at || pending.indexOf(p.code) > -1; }).length;
+    var t = el('tally');
     if (t) t.textContent = (roster.length ? used : '—') + ' / ' + TOTAL;
-    el.innerHTML = roster.map(function (p) {
-      var offline = pendingCodes.indexOf(p.code) > -1;
-      var done = p.used_at || offline;
+    list.innerHTML = roster.map(function (p) {
+      var off = pending.indexOf(p.code) > -1;
+      var done = p.used_at || off;
       return '<li class="' + (done ? 'done' : '') + '"><span class="pip"></span>' +
         '<span class="who">Pass ' + esc(p.pass_no) + '<span>' + esc(p.code) + '</span></span>' +
-        (done
-          ? '<span class="when">' + (offline ? 'offline' : clock(p.used_at)) + '</span>'
-          : '<button data-code="' + esc(p.code) + '">Check in</button>') + '</li>';
+        (done ? '<span class="when">' + (off ? 'offline' : clock(p.used_at)) + '</span>'
+              : '<button data-code="' + esc(p.code) + '">Check in</button>') + '</li>';
     }).join('');
-    Array.prototype.forEach.call(el.querySelectorAll('button[data-code]'), function (b) {
+    Array.prototype.forEach.call(list.querySelectorAll('button[data-code]'), function (b) {
       b.addEventListener('click', function () { check(b.getAttribute('data-code')); });
     });
   }
 
   function netChip(state, label) {
-    var c = document.getElementById('net');
+    var c = el('net');
     if (c) { c.className = 'chip ' + state; c.textContent = label; }
   }
 
@@ -251,71 +286,129 @@
     });
   }
 
+  function beep(pattern) { if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} } }
+
   function check(code) {
+    armed = false;
     post({ action: 'checkin', pin: PIN, code: code }).then(function (r) {
       if (!r.ok) throw new Error('api');
       if (r.status === 'allowed') {
-        return gate('<div class="verdict go"><h2>ENTRY ALLOWED</h2><div class="no">' + esc(r.pass.pass_no) +
+        beep([40, 60, 40]);
+        verdict('<div class="verdict go"><h2>ENTRY ALLOWED</h2><div class="no">' + esc(r.pass.pass_no) +
           '</div><div class="code">' + esc(r.pass.code) + '</div></div>');
-      }
-      if (r.status === 'used') {
-        return gate('<div class="verdict stop"><h2>ALREADY USED</h2><div class="no">' + esc(r.pass.pass_no) +
+      } else if (r.status === 'used') {
+        beep([120, 80, 120]);
+        verdict('<div class="verdict stop"><h2>ALREADY USED</h2><div class="no">' + esc(r.pass.pass_no) +
           '</div><p>Pehle entry ho chuki: ' + clock(r.pass.used_at) + '</p></div>');
+      } else {
+        beep([120, 80, 120]);
+        verdict('<div class="verdict stop"><h2>NOT A VALID PASS</h2><div class="code">' + esc(code) + '</div></div>');
       }
-      return gate('<div class="verdict stop"><h2>NOT A VALID PASS</h2><div class="code">' + esc(code) + '</div></div>');
+      return sync();
     }).catch(function () {
       var known = roster.filter(function (p) { return p.code === code; })[0];
       if (!known) {
-        return gate('<div class="verdict stop"><h2>NOT A VALID PASS</h2><div class="code">' + esc(code) + '</div>' +
+        verdict('<div class="verdict stop"><h2>NOT A VALID PASS</h2><div class="code">' + esc(code) + '</div>' +
           '<p>Offline &mdash; is code ka record nahi mila.</p></div>');
+      } else if (known.used_at || queue.filter(function (q) { return q.code === code; }).length) {
+        verdict('<div class="verdict stop"><h2>ALREADY USED</h2><div class="no">' + esc(known.pass_no) + '</div></div>');
+      } else {
+        queue.push({ code: code, at: Date.now() }); saveQueue();
+        verdict('<div class="verdict hold"><h2>ALLOWED &middot; OFFLINE</h2><div class="no">' + esc(known.pass_no) +
+          '</div><p>Record ho gaya. Internet aate hi sync ho jayega.</p></div>');
       }
-      var already = known.used_at || queue.filter(function (q) { return q.code === code; }).length;
-      if (already) {
-        return gate('<div class="verdict stop"><h2>ALREADY USED</h2><div class="no">' + esc(known.pass_no) + '</div></div>');
-      }
-      queue.push({ code: code, at: Date.now() }); saveQueue();
-      gate('<div class="verdict hold"><h2>ALLOWED &middot; OFFLINE</h2><div class="no">' + esc(known.pass_no) +
-        '</div><p>Record ho gaya. Internet aate hi sync ho jayega.</p></div>');
+      netChip('off', queue.length ? queue.length + ' to sync' : 'offline');
+      paint();
+    }).then(function () {
+      setTimeout(function () { if (stream) armed = true; }, 1600);
     });
   }
 
-  function startCam() {
-    var v = document.getElementById('cam');
-    if (!v || !navigator.mediaDevices) return camFail();
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (s) {
-      stream = s; v.srcObject = s; return v.play();
-    }).then(function () {
-      var c = document.createElement('canvas');
-      var x = c.getContext('2d', { willReadFrequently: true });
-      var det = null;
-      if ('BarcodeDetector' in window) { try { det = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) {} }
-      scanning = false;
-      var done = function (val) {
-        scanning = false;
-        if (val) { stopCam(); check(codeOf(val)); return; }
-        raf = requestAnimationFrame(tick);
-      };
-      var tick = function () {
-        if (v.readyState !== v.HAVE_ENOUGH_DATA || scanning) { raf = requestAnimationFrame(tick); return; }
-        scanning = true;
-        if (det) {
-          det.detect(v).then(function (r) { done(r.length ? r[0].rawValue : null); }).catch(function () { done(null); });
-          return;
-        }
-        try {
-          c.width = v.videoWidth; c.height = v.videoHeight;
-          x.drawImage(v, 0, 0, c.width, c.height);
-          var d = x.getImageData(0, 0, c.width, c.height);
-          var r = (typeof jsQR === 'function') ? jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' }) : null;
-          done(r ? r.data : null);
-        } catch (e) { done(null); }
-      };
-      tick();
-    }).catch(camFail);
+  /* ---------------- camera ---------------- */
+  function cover(tag, why, hint, label) {
+    var c = el('cover');
+    if (!c) return;
+    c.hidden = false;
+    c.innerHTML =
+      '<p class="tag">' + esc(tag) + '</p>' +
+      (why ? '<p class="why">' + esc(why) + '</p>' : '') +
+      (hint ? '<p>' + esc(hint) + '</p>' : '') +
+      '<button class="mini" id="camstart">' + esc(label || 'Try again') + '</button>';
+    el('camstart').addEventListener('click', function () { startCam(false); });
   }
-  function camFail() {
-    var s = document.getElementById('scanner');
-    if (s) s.innerHTML = '<div class="camnote">Camera band hai. Niche list se manually check-in karo, ya camera permission allow karke page reload karo.</div>';
+
+  function startCam(front) {
+    var v = el('cam');
+    if (!v) return;
+
+    if (!window.isSecureContext) {
+      return cover('CAMERA BLOCKED', 'Page ' + location.protocol + '// par khula hai, HTTPS par nahi.',
+        'Camera sirf https:// link par chalta hai. File double-click karke kholne se kabhi nahi chalega.', 'Try again');
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return cover('CAMERA BLOCKED', 'Is browser me camera API hi nahi hai.',
+        'Instagram / WhatsApp ke andar wale browser me camera band hota hai. Link ko Safari ya Chrome me kholo.', 'Try again');
+    }
+
+    cover('STARTING…', '', 'Permission prompt aaye to Allow dabao.', 'Retry');
+
+    var want = front ? { video: true } : { video: { facingMode: { ideal: 'environment' } } };
+    navigator.mediaDevices.getUserMedia(want).then(function (s) {
+      stream = s;
+      v.srcObject = s;
+      v.setAttribute('playsinline', '');
+      var p = v.play();
+      return (p && p.catch) ? p.catch(function () {}) : p;
+    }).then(function () {
+      el('cover').hidden = true;
+      el('reticle').hidden = false;
+      armed = true;
+      loop();
+    }).catch(function (e) {
+      var name = (e && e.name) || 'Error';
+      if ((name === 'OverconstrainedError' || name === 'NotFoundError') && !front) return startCam(true);
+      var m = {
+        NotAllowedError: ['Camera permission allow nahi hui.',
+          'Safari me address bar ke bagal "aA" par tap → Website Settings → Camera → Allow. Ya iPhone Settings → Safari → Camera → Ask/Allow. Phir page reload karke dobara tap karo.'],
+        NotFoundError: ['Is device par camera mila hi nahi.', 'Doosra phone use karo, ya code haath se daal do.'],
+        NotReadableError: ['Camera kisi aur app ne pakad rakha hai.', 'Camera / video call apps band karke page reload karo.'],
+        SecurityError: ['Browser ne security policy ki wajah se camera roka.', 'Link seedha Safari me kholo, kisi app ke andar nahi.'],
+        AbortError: ['Camera start hote hi ruk gaya.', 'Page reload karke dobara tap karo.']
+      }[name] || [name + (e && e.message ? ': ' + e.message : ''), 'Page reload karo, ya code haath se daal do.'];
+      cover('CAMERA NAHI KHULI', m[0], m[1], 'Try again');
+    });
+  }
+
+  function loop() {
+    var v = el('cam');
+    if (!v || !stream) return;
+    var c = document.createElement('canvas');
+    var x = c.getContext('2d', { willReadFrequently: true });
+    var det = null;
+    if ('BarcodeDetector' in window) { try { det = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) {} }
+
+    var done = function (val) {
+      reading = false;
+      if (val && armed) { check(codeOf(val)); }
+      raf = requestAnimationFrame(tick);
+    };
+    var tick = function () {
+      if (!stream) return;
+      if (!armed || reading || v.readyState !== v.HAVE_ENOUGH_DATA) { raf = requestAnimationFrame(tick); return; }
+      reading = true;
+      if (det) {
+        det.detect(v).then(function (r) { done(r.length ? r[0].rawValue : null); }).catch(function () { done(null); });
+        return;
+      }
+      try {
+        c.width = v.videoWidth; c.height = v.videoHeight;
+        x.drawImage(v, 0, 0, c.width, c.height);
+        var d = x.getImageData(0, 0, c.width, c.height);
+        var r = (typeof jsQR === 'function') ? jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' }) : null;
+        done(r ? r.data : null);
+      } catch (e) { done(null); }
+    };
+    tick();
   }
 
   function exportCsv() {
@@ -339,7 +432,7 @@
       '<div class="lede">ENTRY CONTROL</div>' +
       '<p style="color:var(--mist);margin:12px 0 0;font-size:14px">Guest apna pass QR scan karke yahan pahunchta hai. Gate staff niche se scanner kholein.</p>' +
       '<div class="stack" style="margin-top:18px"><button id="open">Open gate scanner</button></div></div>';
-    document.getElementById('open').addEventListener('click', unlock);
+    el('open').addEventListener('click', unlock);
   }
 })();
 </script>
